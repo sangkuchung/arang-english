@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>아랑이 영어 말하기</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
+<style>
+/* Layout: 구몬 학습지 한 장 — 위에 문장 카드 하나, 아래에 큰 말하기 버튼과 결과 */
+:root{
+  --paper:#fffaf2; --ink:#2b2a33; --muted:#6c6878; --card:#ffffff; --line:#eadfcf;
+  --orange:#f08a24; --blue:#3a6fd8; --green:#1f9d6b; --red:#e2514a; --soft:#fff1de;
+  --f-display:"Jua","Gowun Dodum","Malgun Gothic",sans-serif;
+  --f-body:"Gowun Dodum","Malgun Gothic",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#1b1a22; --ink:#f2eff7; --muted:#aaa5b8; --card:#25232e; --line:#3a3746;
+  --orange:#ffa54f; --blue:#7ea4ff; --green:#46c993; --red:#ff7c74; --soft:#33291f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#1b1a22; --ink:#f2eff7; --muted:#aaa5b8; --card:#25232e; --line:#3a3746;
+  --orange:#ffa54f; --blue:#7ea4ff; --green:#46c993; --red:#ff7c74; --soft:#33291f; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:18px;line-height:1.6;
+  padding-inline:16px;padding-block:20px 48px}
+.wrap{max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+h1{font-family:var(--f-display);font-weight:400;font-size:1.7rem;margin:0}
+h1 span{color:var(--orange)}
+select{font:inherit;font-size:.95rem;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.bar{display:flex;align-items:center;gap:10px;font-size:.95rem;color:var(--muted)}
+.dots{display:flex;gap:6px;flex-wrap:wrap}
+.dot{width:14px;height:14px;border-radius:50%;background:var(--line)}
+.dot.ok{background:var(--green)} .dot.ng{background:var(--red)} .dot.now{outline:3px solid var(--orange);outline-offset:1px}
+.card{background:var(--card);border:2px solid var(--line);border-radius:20px;padding:22px 20px;display:flex;flex-direction:column;gap:12px}
+.label{font-size:.8rem;letter-spacing:.08em;color:var(--muted)}
+.ko{font-family:var(--f-display);font-size:1.9rem;line-height:1.35;text-wrap:balance;margin:0}
+.ctx{font-size:.95rem;color:var(--muted);font-family:system-ui,sans-serif}
+.hint{color:var(--blue);font-size:1.05rem;min-height:1.6em}
+.row{display:flex;flex-wrap:wrap;gap:10px}
+button{font:inherit;cursor:pointer;border-radius:14px;border:2px solid var(--line);background:var(--card);color:var(--ink);padding:10px 16px}
+button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+.big{font-family:var(--f-display);font-size:1.5rem;padding:18px;width:100%;border:none;background:var(--orange);color:#fff}
+.big.listening{background:var(--red);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{transform:scale(1.02)}}
+@media (prefers-reduced-motion:reduce){.big.listening{animation:none}}
+.result{border-radius:16px;padding:16px;background:var(--soft);display:flex;flex-direction:column;gap:6px}
+.result .verdict{font-family:var(--f-display);font-size:1.4rem}
+.verdict.ok{color:var(--green)} .verdict.mid{color:var(--orange)} .verdict.ng{color:var(--red)}
+.heard,.answer{font-size:1.05rem;overflow-wrap:anywhere}
+.answer b{font-family:system-ui,sans-serif}
+.typed{display:flex;gap:8px}
+.typed input{flex:1;min-width:0;font:inherit;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.note{font-size:.85rem;color:var(--muted)}
+.done{text-align:center;font-family:var(--f-display);font-size:1.6rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>아랑이 <span>영어 말하기</span></h1>
+    <select id="lessonSel" aria-label="학습지 고르기"></select>
+  </header>
+
+  <div class="bar"><div class="dots" id="dots"></div><span id="count"></span></div>
+
+  <section class="card" id="card">
+    <div class="label">이 말을 영어로 말해 볼까?</div>
+    <div class="ctx" id="ctx" hidden></div>
+    <p class="ko" id="ko"></p>
+    <div class="hint" id="hint"></div>
+    <div class="row">
+      <button id="btnRepeat">🔊 다시 듣기</button>
+      <button id="btnHint">💡 힌트</button>
+      <button id="btnAnswer">정답 듣기</button>
+      <button id="btnNext">다음 ▶</button>
+    </div>
+  </section>
+
+  <button class="big" id="btnGo">▶ 시작하기</button>
+
+  <section class="result" id="result" hidden>
+    <div class="verdict" id="verdict"></div>
+    <div class="heard" id="heard"></div>
+    <div class="answer" id="answer"></div>
+  </section>
+
+  <form class="typed" id="typed">
+    <input id="typedIn" placeholder="마이크가 안 되면 여기에 영어로 써요" autocomplete="off">
+    <button type="submit">확인</button>
+  </form>
+
+  <p class="note" id="note">크롬(Chrome)이나 아이폰 사파리에서 열어 주세요. 처음 한 번 마이크 허용을 눌러야 해요.</p>
+</div>
+
+<script>
+// ── 학습지 데이터: 사진을 받을 때마다 여기에 한 묶음씩 추가 ──
+// ko: 읽어 줄 한국어, en: 정답(여러 개 가능, 첫 번째가 대표 정답)
+// ctx: 대답 문장처럼 앞 질문이 필요할 때 화면에 함께 보여 줄 질문
+const LESSONS = [
+  { title: "2A 131~135 · Does she often cook?", items: [
+    { ko: "그녀는 자주 요리하나요?", en: ["Does she often cook?"] },
+    { ctx: "Does she often cook?", ko: "네, 그래요.", en: ["Yes, she does."] },
+    { ctx: "Does she often cook?", ko: "아니요, 그렇지 않아요.", en: ["No, she does not.", "No, she doesn't."] },
+    { ko: "그녀는 자주 여행하니?", en: ["Does she often travel?"] },
+    { ctx: "Does she often travel?", ko: "응, 그래.", en: ["Yes, she does."] },
+    { ctx: "Does she often travel?", ko: "아니, 그렇지 않아.", en: ["No, she does not.", "No, she doesn't."] },
+  ]},
+  { title: "2A 141~144 · SKIT 3 친구의 방문", items: [
+    { ko: "너는 고양이를 좋아하니?", en: ["Do you like cats?"] },
+    { ctx: "Do you like cats?", ko: "응, 그래.", en: ["Yes, I do."] },
+    { ko: "이거 아주 귀여워!", en: ["It's so cute!", "It is so cute!"] },
+    { ko: "너는 햄버거를 좋아하니?", en: ["Do you like hamburgers?"] },
+    { ctx: "Do you like hamburgers?", ko: "네, 그래요.", en: ["Yes, I do."] },
+    { ko: "이거 맛있어요!", en: ["It's yummy!", "It is yummy!"] },
+    { ko: "고맙구나!", en: ["Thanks!", "Thank you!"] },
+    { ko: "그는 자주 요리하니?", en: ["Does he often cook?"] },
+    { ctx: "Does he often cook?", ko: "응, 그래.", en: ["Yes, he does."] },
+    { ko: "그는 훌륭한 파스타를 만들어.", en: ["He makes great pasta."] },
+    { ko: "내 장난감들은 어디에 있지?", en: ["Where are my toys?"] },
+  ]},
+];
+
+const $ = id => document.getElementById(id);
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let L = 0, i = 0, marks = [], hintLevel = 0, rec = null, listening = false;
+
+// 목소리 고르기
+let voices = [];
+function loadVoices(){ voices = speechSynthesis.getVoices(); }
+loadVoices(); speechSynthesis.onvoiceschanged = loadVoices;
+function speak(text, lang, rate){
+  return new Promise(res => {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang; u.rate = rate || 0.9;
+    const v = voices.find(v => v.lang.replace("_","-").startsWith(lang));
+    if (v) u.voice = v;
+    u.onend = u.onerror = () => res();
+    speechSynthesis.speak(u);
+  });
+}
+
+// 비교용 정리: 소문자, 문장부호 제거, 줄임말 풀기, 숫자→단어
+const NUM = {"0":"zero","1":"one","2":"two","3":"three","4":"four","5":"five","6":"six","7":"seven","8":"eight","9":"nine","10":"ten","11":"eleven","12":"twelve"};
+const CONTR = {"i'm":"i am","you're":"you are","he's":"he is","she's":"she is","it's":"it is","we're":"we are","they're":"they are","that's":"that is","what's":"what is","isn't":"is not","aren't":"are not","don't":"do not","doesn't":"does not","can't":"can not","cannot":"can not","i'll":"i will","let's":"let us"};
+function norm(s){
+  return s.toLowerCase().replace(/[’`]/g,"'").split(/\s+/)
+    .map(w => w.replace(/[^a-z0-9']/g,"")).filter(Boolean)
+    .map(w => CONTR[w] || NUM[w] || w).join(" ").split(" ");
+}
+// 단어 단위 편집거리로 비슷한 정도(0~1)
+function similar(a, b){
+  const m = a.length, n = b.length, d = Array.from({length:m+1},(_,x)=>[x]);
+  for (let y=1;y<=n;y++) d[0][y]=y;
+  for (let x=1;x<=m;x++) for (let y=1;y<=n;y++)
+    d[x][y] = Math.min(d[x-1][y]+1, d[x][y-1]+1, d[x-1][y-1]+(a[x-1]===b[y-1]?0:1));
+  return 1 - d[m][n] / Math.max(m, n, 1);
+}
+
+function item(){ return LESSONS[L].items[i]; }
+function render(){
+  const items = LESSONS[L].items;
+  $("dots").innerHTML = items.map((_,k)=>`<span class="dot ${marks[k]||""} ${k===i?"now":""}"></span>`).join("");
+  $("count").textContent = `${Math.min(i+1, items.length)} / ${items.length}`;
+  if (i >= items.length){
+    const ok = marks.filter(m=>m==="ok").length;
+    $("ko").textContent = `다 했어요! ${items.length}개 중 ${ok}개 성공 🎉`;
+    $("hint").textContent = ""; $("result").hidden = true;
+    $("btnGo").textContent = "↺ 처음부터 다시"; return;
+  }
+  $("ko").textContent = item().ko;
+  $("ctx").hidden = !item().ctx;
+  $("ctx").textContent = item().ctx ? "질문: " + item().ctx + " 에 대답해 봐요" : "";
+  $("hint").textContent = "";
+  hintLevel = 0;
+}
+
+async function ask(){
+  if (i >= LESSONS[L].items.length){ i = 0; marks = []; render(); }
+  $("result").hidden = true;
+  $("btnGo").textContent = "🔊 듣는 중…";
+  await speak(item().ko, "ko-KR", 0.95);
+  listen();
+}
+
+function listen(){
+  if (!SR){ $("btnGo").textContent = "▶ 다시 듣기"; $("note").textContent = "이 브라우저는 음성 인식이 안 돼요. 크롬에서 열거나 아래 칸에 써 주세요."; return; }
+  rec = new SR();
+  rec.lang = "en-US"; rec.interimResults = true; rec.maxAlternatives = 5;
+  let finalAlts = [];
+  rec.onresult = e => {
+    const r = e.results[e.results.length-1];
+    $("result").hidden = false; $("verdict").textContent = ""; $("verdict").className = "verdict";
+    $("heard").textContent = "들은 말: " + r[0].transcript; $("answer").textContent = "";
+    if (r.isFinal) finalAlts = Array.from(r).map(a=>a.transcript);
+  };
+  rec.onerror = e => {
+    if (e.error === "not-allowed") $("note").textContent = "마이크가 막혀 있어요. 주소창 왼쪽 자물쇠를 눌러 마이크를 허용해 주세요.";
+  };
+  rec.onend = () => {
+    listening = false; $("btnGo").classList.remove("listening");
+    $("btnGo").textContent = "🎤 다시 말하기";
+    if (finalAlts.length) check(finalAlts);
+  };
+  listening = true; $("btnGo").classList.add("listening");
+  $("btnGo").textContent = "🎤 영어로 말해요! (듣고 있어요)";
+  try { rec.start(); } catch(_) {}
+}
+
+function check(alts){
+  const answers = item().en.map(norm);
+  let best = 0, bestAlt = alts[0];
+  for (const a of alts) for (const ans of answers){
+    const s = similar(norm(a), ans);
+    if (s > best){ best = s; bestAlt = a; }
+  }
+  const main = item().en[0];
+  $("result").hidden = false;
+  $("heard").textContent = "들은 말: " + bestAlt;
+  const v = $("verdict");
+  if (best >= 0.99){
+    v.textContent = "딩동댕! 완벽해요 ⭐"; v.className = "verdict ok"; marks[i] = "ok";
+    $("answer").innerHTML = "";
+    speak("Great job!", "en-US", 1);
+  } else if (best >= 0.7){
+    v.textContent = "거의 맞았어요! 👍"; v.className = "verdict mid"; marks[i] = marks[i] || "ok";
+    $("answer").innerHTML = `정답: <b>${main}</b>`;
+    speak(main, "en-US", 0.8);
+  } else {
+    v.textContent = "다시 해 볼까요? 💪"; v.className = "verdict ng"; if (!marks[i]) marks[i] = "ng";
+    $("answer").innerHTML = `정답: <b>${main}</b>`;
+    speak(main, "en-US", 0.8);
+  }
+  render(); $("ko").textContent = item().ko;
+}
+
+$("btnGo").onclick = () => {
+  if (listening){ rec && rec.stop(); return; }
+  if ($("btnGo").textContent.includes("다시 말하기")) listen(); else ask();
+};
+$("btnRepeat").onclick = () => speak(item().ko, "ko-KR", 0.95);
+$("btnHint").onclick = () => {
+  const words = item().en[0].split(" ");
+  hintLevel = Math.min(hintLevel + 1, words.length);
+  $("hint").textContent = "힌트: " + words.slice(0, hintLevel).join(" ") + (hintLevel < words.length ? " …" : "");
+};
+$("btnAnswer").onclick = () => {
+  $("result").hidden = false; $("verdict").textContent = ""; $("heard").textContent = "";
+  $("answer").innerHTML = `정답: <b>${item().en[0]}</b>`;
+  speak(item().en[0], "en-US", 0.8);
+};
+$("btnNext").onclick = () => {
+  if (listening && rec) rec.abort();
+  i++; render(); $("result").hidden = true;
+  if (i < LESSONS[L].items.length) ask();
+};
+$("typed").onsubmit = e => {
+  e.preventDefault();
+  const t = $("typedIn").value.trim(); if (!t) return;
+  check([t]); $("typedIn").value = "";
+};
+$("lessonSel").innerHTML = LESSONS.map((l,k)=>`<option value="${k}">${l.title}</option>`).join("");
+$("lessonSel").value = LESSONS.length - 1; L = LESSONS.length - 1;
+$("lessonSel").onchange = e => { L = +e.target.value; i = 0; marks = []; render(); $("result").hidden = true; $("btnGo").textContent = "▶ 시작하기"; };
+render();
+</script>
+</body>
+</html>
