@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>내 위치 조깅 코스</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#f3f6f8;--ink:#1d252c;--muted:#5f6b75;--card:#fff;--line:#dde3e8;--accent:#e0702b;--route:#2563eb;--ok:#2e8b57}
+@media (prefers-color-scheme:dark){:root{--bg:#11161b;--ink:#e8edf1;--muted:#a3adb6;--card:#1a2129;--line:#2b343e;--accent:#f39a5c;--route:#60a5fa;--ok:#6fd39a;color-scheme:dark}}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:16px;line-height:1.5}
+.wrap{max-width:640px;margin:0 auto;padding:16px;display:grid;gap:12px}
+h1{font-size:24px;margin:0}
+.sub{margin:0;color:var(--muted);font-size:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chip{font:inherit;font-size:15px;padding:7px 14px;border-radius:999px;border:2px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.chip[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);font-weight:700}
+.go{font:inherit;font-weight:700;font-size:18px;width:100%;padding:14px;border-radius:14px;border:0;background:var(--accent);color:#fff;cursor:pointer}
+#map{height:56vh;min-height:320px;border-radius:14px;border:1px solid var(--line)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:6px}
+.big{font-size:26px;font-weight:800}
+.opts{display:grid;gap:6px}
+.opt{font:inherit;text-align:left;padding:10px 12px;border-radius:12px;border:2px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.opt[aria-pressed="true"]{border-color:var(--route)}
+.opt b{font-size:17px}
+.msg{margin:0;color:var(--muted);font-size:14px}
+a.btn{display:block;text-align:center;padding:11px;border-radius:12px;border:2px solid var(--route);color:var(--route);font-weight:700;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🏃 내 위치 조깅 코스</h1>
+  <p class="sub">휴대폰 GPS로 지금 위치를 잡아, 공원·강변 같은 반환점까지 다녀오는 왕복 코스를 찾아요.</p>
+  <div class="row" id="dist" role="group" aria-label="왕복 거리">
+    <button class="chip" data-d="3">왕복 3km</button><button class="chip" data-d="5" aria-pressed="true">왕복 5km</button><button class="chip" data-d="7">왕복 7km</button><button class="chip" data-d="10">왕복 10km</button>
+  </div>
+  <button class="go" id="go">📍 내 위치로 코스 만들기</button>
+  <p class="msg" id="msg">버튼을 누르고 위치 권한을 허용해 주세요.</p>
+  <div id="map"></div>
+  <div class="card" id="res" hidden>
+    <span class="msg">추천 코스</span>
+    <span class="big" id="rd"></span>
+    <span id="rinfo"></span>
+    <div class="opts" id="opts"></div>
+    <a class="btn" id="gmap" target="_blank" rel="noopener">구글 지도에서 길안내 열기 ↗</a>
+  </div>
+  <p class="msg">경로: OpenStreetMap 보행자 경로(OSRM) · 반환점까지 같은 길로 다녀오는 기준이에요. 실제 길 상태와 안전은 현장에서 확인하세요.</p>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+let TARGET=5000,map,layer,me=null,routes=[];
+map=L.map('map',{zoomControl:true}).setView([37.35,127.95],12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+layer=L.layerGroup().addTo(map);
+document.querySelectorAll('#dist .chip').forEach(b=>b.onclick=()=>{TARGET=+b.dataset.d*1000;document.querySelectorAll('#dist .chip').forEach(x=>x.setAttribute('aria-pressed',x===b));if(me)build();});
+const R=6371000,toR=d=>d*Math.PI/180;
+function hav(a,b){const dl=toR(b[0]-a[0]),dn=toR(b[1]-a[1]);const x=Math.sin(dl/2)**2+Math.cos(toR(a[0]))*Math.cos(toR(b[0]))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
+function dest(p,brg,d){const b=toR(brg),la=toR(p[0]),lo=toR(p[1]),dr=d/R;const la2=Math.asin(Math.sin(la)*Math.cos(dr)+Math.cos(la)*Math.sin(dr)*Math.cos(b));const lo2=lo+Math.atan2(Math.sin(b)*Math.sin(dr)*Math.cos(la),Math.cos(dr)-Math.sin(la)*Math.sin(la2));return[la2*180/Math.PI,lo2*180/Math.PI];}
+async function pois(p){
+ const r=TARGET/2,q=`[out:json][timeout:20];(way["leisure"="park"]["name"](around:${Math.round(r*1.15)},${p[0]},${p[1]});relation["leisure"="park"]["name"](around:${Math.round(r*1.15)},${p[0]},${p[1]});way["leisure"="track"](around:${Math.round(r*1.15)},${p[0]},${p[1]});node["natural"="beach"](around:${Math.round(r*1.2)},${p[0]},${p[1]});way["natural"="beach"]["name"](around:${Math.round(r*1.2)},${p[0]},${p[1]}););out center tags 80;`;
+ try{const j=await (await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q)})).json();
+  return j.elements.map(e=>({p:[e.lat||e.center.lat,e.lon||e.center.lon],name:(e.tags&&(e.tags['name:ko']||e.tags.name))||(e.tags&&e.tags.leisure==='track'?'트랙':'공원'),park:true}))
+   .filter(x=>{const d=hav(p,x.p);return d>r*0.45&&d<r*1.05;});}catch(e){return[];}
+}
+async function route(a,b){
+ const u=`https://routing.openstreetmap.de/routed-foot/route/v1/foot/${a[1]},${a[0]};${b[1]},${b[0]}?overview=full&geometries=geojson`;
+ const j=await (await fetch(u)).json();if(!j.routes||!j.routes.length)return null;
+ const g=j.routes[0];return{d:g.distance,line:g.geometry.coordinates.map(c=>[c[1],c[0]])};
+}
+async function build(){
+ layer.clearLayers();$('res').hidden=true;$('msg').textContent='공원·강변 반환점을 찾는 중…';
+ L.circleMarker(me,{radius:8,color:'#fff',weight:3,fillColor:'#e0702b',fillOpacity:1}).addTo(layer).bindPopup('지금 위치');
+ let cands=(await pois(me)).slice(0,14);
+ const seen=new Set();cands=cands.filter(c=>{const k=c.name;if(seen.has(k))return false;seen.add(k);return true;}).slice(0,8);
+ for(let b=0;b<360;b+=45)cands.push({p:dest(me,b,TARGET/2*0.78),name:['북','북동','동','남동','남','남서','서','북서'][b/45]+'쪽 반환점',park:false});
+ $('msg').textContent=`후보 ${cands.length}곳의 실제 걷는 길 거리를 재는 중…`;
+ const out=[];
+ for(const c of cands){try{const r=await route(me,c.p);if(r){out.push({...c,d:r.d,line:r.line,score:Math.abs(r.d*2-TARGET)/TARGET-(c.park?0.12:0)});}}catch(e){}}
+ if(!out.length){$('msg').textContent='경로를 찾지 못했어요. 잠시 후 다시 시도해 주세요.';return;}
+ routes=out.filter(o=>Math.abs(o.d*2-TARGET)<TARGET*0.25).sort((a,b)=>a.score-b.score);
+ if(!routes.length)routes=out.sort((a,b)=>a.score-b.score);
+ routes=routes.slice(0,4);
+ $('opts').innerHTML=routes.map((r,i)=>`<button class="opt" data-i="${i}" aria-pressed="${i===0}"><b>${r.park?'🌳 ':'🧭 '}${r.name}</b> · 왕복 ${(r.d*2/1000).toFixed(1)}km</button>`).join('');
+ document.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{document.querySelectorAll('.opt').forEach(x=>x.setAttribute('aria-pressed',x===b));show(+b.dataset.i);});
+ show(0);$('res').hidden=false;$('msg').textContent='코스를 골랐어요. 아래에서 다른 반환점도 고를 수 있어요.';
+}
+function show(i){
+ const r=routes[i];layer.eachLayer(l=>{if(l instanceof L.Polyline)layer.removeLayer(l);});
+ layer.eachLayer(l=>{if(l.options&&l.options.turn)layer.removeLayer(l);});
+ const pl=L.polyline(r.line,{color:getComputedStyle(document.documentElement).getPropertyValue('--route').trim()||'#2563eb',weight:6,opacity:.85}).addTo(layer);
+ L.marker(r.line[r.line.length-1],{turn:true}).addTo(layer).bindPopup('반환점: '+r.name).openPopup();
+ map.fitBounds(pl.getBounds(),{padding:[30,30]});
+ const km=r.d*2/1000;$('rd').textContent=`왕복 ${km.toFixed(1)}km`;
+ $('rinfo').textContent=`반환점 ${r.name}까지 편도 ${(r.d/1000).toFixed(1)}km · 6분/km 페이스면 약 ${Math.round(km*6)}분`;
+ const e=r.line[r.line.length-1];$('gmap').href=`https://www.google.com/maps/dir/?api=1&origin=${me[0]},${me[1]}&destination=${e[0]},${e[1]}&travelmode=walking`;
+}
+$('go').onclick=()=>{
+ if(!navigator.geolocation){$('msg').textContent='이 브라우저는 위치를 지원하지 않아요.';return;}
+ $('msg').textContent='위치를 찾는 중…';
+ navigator.geolocation.getCurrentPosition(p=>{me=[p.coords.latitude,p.coords.longitude];map.setView(me,15);build();},
+  e=>{$('msg').textContent=e.code===1?'위치 권한이 꺼져 있어요. 주소창 옆 자물쇠 → 위치 허용 후 다시 눌러 주세요.':'위치를 못 찾았어요. 잠시 후 다시 눌러 주세요.';},
+  {enableHighAccuracy:true,timeout:15000});
+};
+</script>
+</body>
+</html>
