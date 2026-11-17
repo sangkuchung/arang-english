@@ -44,6 +44,10 @@ h1{font-family:var(--title);font-weight:400;font-size:clamp(26px,6.5vw,34px);mar
 .list{display:grid;gap:12px}
 .q{background:var(--card);border:2px solid var(--line);border-radius:18px;padding:14px 16px;display:grid;gap:10px}
 .q.ok{border-color:var(--ok)}
+.q.ch{border-style:dashed;border-color:var(--gold)}
+.q.ch.ok{border-style:solid;border-color:var(--ok)}
+.chh{font-family:var(--title);font-weight:400;font-size:22px;margin:8px 0 0;display:grid;gap:2px;text-align:center}
+.chh small{font-family:var(--body);font-size:14px;color:var(--muted)}
 .q .top{display:flex;gap:10px;align-items:baseline}
 .q .n{font-family:var(--num);font-size:16px;color:var(--muted);flex:none}
 .q .tag{font-size:13px;color:var(--muted);margin-left:auto;flex:none}
@@ -153,13 +157,26 @@ const G2=[ // 초2 2학기
  ()=>{const p=ri(3,8),e=ri(3,9),n=pick(['사탕','딸기','구슬']);return{tag:'곱셈구구',t:`${NAMES[1][0]}가 ${n}을 한 봉지에 <b>${e}</b>개씩 <b>${p}</b>봉지 샀어요. 모두 몇 개일까요?`,a:p*e,u:'개',h:`${e} × ${p} 를 계산해요.`};},
  ()=>{const a=ri(120,480),b=ri(110,390);return{tag:'덧셈',t:`줄넘기를 어제 <b>${a}</b>번, 오늘 <b>${b}</b>번 했어요. 모두 몇 번일까요?`,a:a+b,u:'번',h:`${a} + ${b} 를 자리별로 더해요.`};},
 ];
+// ── 최상위 도전: 여러 단계를 생각해야 풀리는 문제 (학년별 3개, 10문제 뒤에 붙음) ──
+const CH3=[ // 초3
+ {tag:'최상위 도전',t:`길이가 <b>36m</b>인 길의 <b>양쪽</b>에 처음부터 끝까지 <b>4m</b> 간격으로 나무를 심어요. 나무는 모두 몇 그루가 필요할까요?`,a:20,u:'그루',h:`36 ÷ 4 = 9칸이에요. 손가락 5개 사이 틈은 4개죠? 나무는 칸보다 하나 많아요. 그리고 길은 양쪽!`},
+ {tag:'최상위 도전',t:`동화책을 펼쳤더니 양쪽 두 쪽수를 더한 값이 <b>85</b>였어요. <b>왼쪽</b>은 몇 쪽일까요?`,a:42,u:'쪽',h:`펼친 두 쪽은 이어지는 수예요. □ + (□ + 1) = 85. 책의 왼쪽은 언제나 짝수 쪽이에요.`},
+ {tag:'최상위 도전',t:`크기가 같은 동전 <b>3개</b>를 일렬로 꼭 붙여 놓았어요. 첫 번째 동전의 중심에서 세 번째 동전의 중심까지 <b>24cm</b>예요. 동전의 반지름은 몇 cm일까요?`,a:6,u:'cm',h:`그림을 그려 보세요. 이웃한 두 동전의 중심 사이는 반지름 2개만큼이에요. 첫째에서 셋째까지는 반지름 몇 개?`},
+];
+const CH2=[ // 초2
+ {tag:'최상위 도전',t:`숫자 카드 <b>3, 7, 0, 5</b> 중 3장으로 세 자리 수를 만들어요. 가장 큰 수와 가장 작은 수의 차는 얼마일까요?`,a:448,h:`가장 큰 수는 753이에요. 0은 맨 앞자리에 올 수 없으니 가장 작은 수는 0으로 시작하지 않아요.`},
+ {tag:'최상위 도전',t:`로봇이 어떤 수에 <b>7을 곱해야</b> 하는데, 실수로 <b>7을 더해서</b> 15가 나왔어요. 바르게 계산하면 얼마일까요?`,a:56,h:`먼저 □ + 7 = 15에서 어떤 수 □를 찾고, 그다음 □ × 7을 계산해요.`},
+ {tag:'최상위 도전',t:`이쑤시개로 정사각형을 옆으로 붙여 만들어요. 1개에 4개, 2개에 7개, 3개에 10개가 들어요. 정사각형 <b>6개</b>에는 몇 개가 필요할까요?`,a:19,u:'개',h:`붙은 변은 같이 써요. 정사각형이 하나 늘 때마다 이쑤시개는 3개씩 늘어나요: 4, 7, 10, …`},
+];
 function build(k,variant){
  R=rng(WEEK*10+k*7+variant*1000);
  const pool=k===0?G3:G2,qs=[];
  const order=pool.map((f,i)=>i).sort(()=>R()-0.5);
  while(qs.length<10){qs.push(pool[order[qs.length%order.length]]());}
+ (k===0?CH3:CH2).forEach(c=>qs.push({...c,ch:true}));
  return qs;
 }
+const lab=i=>QS[i].ch?'도전'+(i-9):'Q'+(i+1);
 
 // ── 화면 ────────────────────────────────────────────────
 let K=0,V=0,QS=[],state=[],T0=Date.now();
@@ -167,7 +184,7 @@ const $=x=>document.getElementById(x);
 function render(){
  QS=build(K,V);state=QS.map(()=>({ok:false,tries:0,wrong:[]}));T0=Date.now();
  document.querySelectorAll('.kid').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.k===K));
- $('list').innerHTML=QS.map((q,i)=>`<article class="q" id="q${i}"><div class="top"><span class="n">Q${i+1}</span><p class="t">${q.t}</p><span class="tag">${q.tag}</span></div>
+ $('list').innerHTML=QS.map((q,i)=>`${q.ch&&!QS[i-1].ch?'<h2 class="chh">🏔️ 최상위 도전 문제<small>천천히 생각해야 풀리는 문제예요. 그림을 그려 봐도 좋아요!</small></h2>':''}<article class="q${q.ch?' ch':''}" id="q${i}"><div class="top"><span class="n">${lab(i)}</span><p class="t">${q.t}</p><span class="tag">${q.tag}</span></div>
   <form class="row" data-i="${i}"><input inputmode="numeric" pattern="[0-9]*" aria-label="${i+1}번 답" autocomplete="off"><span class="unit">${q.u||''}</span><button class="go" type="submit">확인</button></form>
   <p class="fb" id="fb${i}"></p><p class="hint" id="h${i}" hidden></p></article>`).join('');
  $('list').querySelectorAll('form').forEach(f=>f.onsubmit=e=>{e.preventDefault();check(+f.dataset.i,f.querySelector('input'));});
@@ -188,10 +205,10 @@ function summary(star){
  const miss=QS.map((q,i)=>({q,s:state[i],i})).filter(x=>x.s.tries>0);
  const plain=h=>h.replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();
  let t=`[${NAMES[K][0]} 수학 퀴즈 결과] ${document.getElementById('wk').textContent.split(' (')[0]}${V?' · 추가 문제 '+V:''}
-⭐ ${star} / 10 (한 번에 맞힘) · 걸린 시간 약 ${min}분`;
+⭐ ${star} / 10 (한 번에 맞힘) · 🏔️ 도전 ${chStar()} / 3 · 걸린 시간 약 ${min}분`;
  if(!miss.length)t+='\n🏆 모든 문제를 한 번에 맞혔어요!';
  else{t+='\n다시 볼 문제:';miss.forEach(x=>{t+=`
-· Q${x.i+1} ${plain(x.q.t)} → 정답 ${x.q.a}${x.q.u||''} (쓴 답 ${x.s.wrong.join(', ')})`;});}
+· ${lab(x.i)} ${plain(x.q.t)} → 정답 ${x.q.a}${x.q.u||''} (쓴 답 ${x.s.wrong.join(', ')})`;});}
  return t;
 }
 // ── 아빠에게 자동 전송 (ntfy 중계 → 아빠 PC의 Claude가 카톡으로 전달) ──
@@ -200,8 +217,8 @@ let sentKey='';
 function compact(star){
  const min=Math.max(1,Math.round((Date.now()-T0)/60000));
  const miss=QS.map((q,i)=>({q,s:state[i],i})).filter(x=>x.s.tries>0);
- let t=`[${NAMES[K][0]} 수학] ${document.getElementById('wk').textContent.split(' (')[0]}${V?' 추가'+V:''} ⭐${star}/10 · ${min}분`;
- t+= miss.length ? '\n다시 볼 문제: '+miss.map(x=>`Q${x.i+1} ${x.q.tag} 정답 ${x.q.a}${x.q.u||''}(쓴 답 ${x.s.wrong.join('·')})`).join(', ') : '\n🏆 전부 한 번에 맞힘!';
+ let t=`[${NAMES[K][0]} 수학] ${document.getElementById('wk').textContent.split(' (')[0]}${V?' 추가'+V:''} ⭐${star}/10 · 🏔️도전 ${chStar()}/3 · ${min}분`;
+ t+= miss.length ? '\n다시 볼 문제: '+miss.map(x=>`${lab(x.i)} ${x.q.ch?'':x.q.tag+' '}정답 ${x.q.a}${x.q.u||''}(쓴 답 ${x.s.wrong.join('·')})`).join(', ') : '\n🏆 전부 한 번에 맞힘!';
  return t;
 }
 function autoSend(star){
@@ -211,11 +228,12 @@ function autoSend(star){
   .then(r=>{m.textContent=r.ok?'✅ 아빠 카톡으로 결과가 자동으로 가고 있어요. (조금 늦게 도착할 수 있어요)':'자동 전송이 안 됐어요. 아래 버튼으로 보내 주세요.';})
   .catch(()=>{m.textContent='인터넷이 불안정해서 자동 전송이 안 됐어요. 아래 버튼으로 보내 주세요.';});
 }
+function chStar(){return state.filter((s,i)=>QS[i].ch&&s.ok&&s.tries===0).length;}
 function upd(){
- const done=state.filter(s=>s.ok).length,star=state.filter((s,i)=>s.ok&&s.tries===0).length;
- $('sc').textContent=NAMES[K][0]+' · '+done+' / 10 문제';$('st').textContent='⭐ '+star;
- $('pg').style.width=done*10+'%';
- if(done===10){$('end').hidden=false;$('endE').textContent=star>=9?'🏆':star>=7?'🎉':'💪';
+ const N=QS.length,done=state.filter(s=>s.ok).length,star=state.filter((s,i)=>!QS[i].ch&&s.ok&&s.tries===0).length;
+ $('sc').textContent=NAMES[K][0]+' · '+done+' / '+N+' 문제';$('st').textContent='⭐ '+star+(chStar()?' · 🏔️ '+chStar():'');
+ $('pg').style.width=done/N*100+'%';
+ if(done===N){$('end').hidden=false;$('endE').textContent=star>=9?'🏆':star>=7?'🎉':'💪';
   $('endT').textContent=`⭐ ${star}개! ${star>=9?'수학 박사!':star>=7?'아주 잘했어요!':'끝까지 풀었어요, 멋져요!'}`;
   $('endS').textContent='틀린 문제는 도움말을 다시 읽어 보세요. 다른 문제로 한 번 더 풀 수도 있어요.';
   $('res').textContent=summary(star);
