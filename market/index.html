@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>시장판</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#0f141a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<style>
+:root{--bg:#0f141a;--card:#171e26;--line:#26303b;--ink:#eef2f5;--muted:#8a96a3;--up:#ff5a5f;--down:#4d8dff}
+:root[data-theme="light"]{--bg:#f2f4f6;--card:#fff;--line:#dde2e7;--ink:#111820;--muted:#66717c;--up:#e0262c;--down:#1f66e5}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;-webkit-user-select:none;user-select:none}
+.app{min-height:100%;display:grid;grid-template-rows:auto 1fr auto auto;gap:2vmin;padding:max(16px,2.5vmin) max(16px,3vmin)}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{margin:0;font-size:clamp(20px,3.2vmin,34px);letter-spacing:-.5px}
+.clock{font-size:clamp(16px,2.6vmin,28px);color:var(--muted);font-variant-numeric:tabular-nums}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.tools button{font:inherit;font-size:clamp(13px,1.8vmin,17px);padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.tools button[aria-pressed="true"]{border-color:var(--up);color:var(--up)}
+.big{display:grid;grid-template-columns:repeat(3,1fr);gap:2vmin}
+.card{background:var(--card);border:1px solid var(--line);border-radius:2.4vmin;padding:2.6vmin 3vmin;display:flex;flex-direction:column;justify-content:space-between;min-width:0}
+.name{font-size:clamp(16px,2.6vmin,30px);color:var(--muted);font-weight:600}
+.val{font-size:clamp(44px,9vmin,120px);font-weight:800;letter-spacing:-2px;line-height:1.05;font-variant-numeric:tabular-nums}
+.val small{font-size:.45em;font-weight:700;margin-left:.1em;color:var(--muted)}
+.chg{font-size:clamp(18px,3.4vmin,40px);font-weight:700;font-variant-numeric:tabular-nums}
+.chg span{color:var(--muted);font-weight:500;font-size:.6em}
+.up{color:var(--up)}.down{color:var(--down)}.flat{color:var(--muted)}
+svg.spark{width:100%;height:9vmin;min-height:44px;margin-top:1vmin}
+.small{display:grid;grid-template-columns:repeat(4,1fr);gap:2vmin}
+.small .card{padding:1.8vmin 2.4vmin;flex-direction:row;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.small .name{font-size:clamp(14px,2vmin,22px)}
+.small .v{font-size:clamp(20px,3.6vmin,42px);font-weight:800;font-variant-numeric:tabular-nums}
+.small .c{font-size:clamp(13px,2vmin,22px);font-weight:700}
+footer{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:clamp(12px,1.7vmin,16px)}
+.stale{color:#f5a524}
+@media (orientation:portrait){.big{grid-template-columns:1fr}.small{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>📈 시장판</h1>
+    <span class="clock" id="clock"></span>
+    <div class="tools">
+      <button id="wake" aria-pressed="false">화면 켜두기</button>
+      <button id="theme">밝게</button>
+      <button id="full">전체화면</button>
+    </div>
+  </header>
+  <section class="big" id="big"></section>
+  <section class="small" id="small"></section>
+  <footer><span id="upd">불러오는 중…</span><span id="src"></span></footer>
+</div>
+<script>
+const RAW='https://raw.githubusercontent.com/sangkuchung/arang-english/main/market/data.json';
+const BIG=[['kr30','국고채 30년','bp'],['us30','미국채 30년','bp'],['fx','원/달러','pct']];
+const SMALL=[['kr3','국고 3년'],['kr10','국고 10년'],['us2','미국 2년'],['us10','미국 10년']];
+const $=id=>document.getElementById(id);
+const cls=v=>v>0?'up':v<0?'down':'flat', arr=v=>v>0?'▲':v<0?'▼':'─';
+const bp=v=>arr(v)+' '+Math.abs(Math.round(v*100))+'bp';
+let data=null;
+
+function spark(hist,key){
+  const pts=hist.filter(p=>p[key]!=null).slice(-60);
+  if(pts.length<2)return '';
+  const ys=pts.map(p=>p[key]),mn=Math.min(...ys),mx=Math.max(...ys),r=mx-mn||1,W=300,H=60;
+  const d=pts.map((p,i)=>(i?'L':'M')+(i/(pts.length-1)*W).toFixed(1)+','+(H-4-(p[key]-mn)/r*(H-8)).toFixed(1)).join('');
+  const c=ys[ys.length-1]>=ys[0]?'var(--up)':'var(--down)';
+  return '<svg class="spark" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none"><path d="'+d+'" fill="none" stroke="'+c+'" stroke-width="3" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>';
+}
+
+function render(){
+  if(!data)return;
+  const n=data.now;
+  $('big').innerHTML=BIG.map(([k,name,kind])=>{
+    const q=n[k];
+    if(!q)return '<div class="card"><div class="name">'+name+'</div><div class="val">–</div></div>';
+    const v=q[0],c=q[1];
+    const val=kind==='pct'
+      ? v.toLocaleString('ko-KR',{minimumFractionDigits:1,maximumFractionDigits:1})+'<small>원</small>'
+      : v.toFixed(2)+'<small>%</small>';
+    const ch=kind==='pct'?arr(c)+' '+Math.abs(c).toFixed(2)+'%':bp(c);
+    return '<div class="card"><div class="name">'+name+'</div><div class="val">'+val+'</div>'
+      +'<div class="chg '+cls(c)+'">'+ch+' <span>전일대비</span></div>'+spark(data.hist||[],k)+'</div>';
+  }).join('');
+  $('small').innerHTML=SMALL.map(([k,name])=>{
+    const q=n[k];
+    return '<div class="card"><span class="name">'+name+'</span><span class="v">'+(q?q[0].toFixed(2)+'%':'–')+'</span>'
+      +(q?'<span class="c '+cls(q[1])+'">'+bp(q[1])+'</span>':'')+'</div>';
+  }).join('');
+  const age=Math.round((Date.now()/1000-data.ts)/60);
+  $('upd').innerHTML=data.updated+' 기준 <span class="'+(age>90?'stale':'')+'">('+(age<1?'방금':age+'분 전')+' 수집)</span> · 20분마다 자동 갱신';
+  $('src').textContent='출처 '+data.source;
+}
+
+async function load(){
+  for(const u of [RAW+'?t='+Date.now(),'data.json?t='+Date.now()]){
+    try{const r=await fetch(u,{cache:'no-store'});if(r.ok){data=await r.json();render();return;}}catch(e){}
+  }
+  if(!data)$('upd').textContent='데이터를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.';
+}
+
+function tick(){
+  $('clock').textContent=new Date().toLocaleString('ko-KR',{month:'long',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit'});
+  if(data)render();
+}
+
+let lock=null;
+async function wakeOn(){lock=await navigator.wakeLock.request('screen');lock.addEventListener('release',()=>{lock=null;});}
+$('wake').onclick=async()=>{
+  const on=$('wake').getAttribute('aria-pressed')==='true';
+  try{
+    if(on){if(lock)await lock.release();lock=null;$('wake').setAttribute('aria-pressed','false');}
+    else{await wakeOn();$('wake').setAttribute('aria-pressed','true');}
+  }catch(e){alert('이 기기에서는 화면 켜두기를 지원하지 않아요.');}
+};
+document.addEventListener('visibilitychange',async()=>{
+  if(document.visibilityState!=='visible')return;
+  load();
+  if($('wake').getAttribute('aria-pressed')==='true'&&!lock){try{await wakeOn();}catch(e){}}
+});
+
+function setTheme(t){
+  document.documentElement.dataset.theme=t;
+  $('theme').textContent=t==='light'?'어둡게':'밝게';
+  try{localStorage.setItem('mb-theme',t);}catch(e){}
+}
+$('theme').onclick=()=>setTheme(document.documentElement.dataset.theme==='light'?'dark':'light');
+let saved='dark';try{saved=localStorage.getItem('mb-theme')||'dark';}catch(e){}
+setTheme(saved);
+
+$('full').onclick=()=>{
+  if(document.fullscreenElement)document.exitFullscreen();
+  else if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen();
+};
+
+tick();load();
+setInterval(tick,30000);
+setInterval(load,5*60000);
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
